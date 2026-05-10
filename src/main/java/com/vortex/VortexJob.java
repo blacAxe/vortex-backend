@@ -22,6 +22,10 @@ public class VortexJob {
 
     public String severity;
 
+    public Long scanDurationMs;
+
+    public String workerNode;
+
     public VortexJob() {}
 
     public VortexJob(String name, String status, String filepath) {

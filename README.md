@@ -1,213 +1,277 @@
-# Vortex Job Service
+# VORTEX
 
-Simple Spring Boot backend that handles asynchronous file analysis and background job processing.
+Distributed Malware Analysis and Threat Detection Service built with Spring Boot.
 
-It exposes an API where files can be uploaded, analyzed by async workers, classified for suspicious behavior, and stored with scan results and severity levels.
+VORTEX is a modular backend security service designed to analyze uploaded files, detect malicious patterns, classify threats, and expose analytics APIs for integration into larger security platforms.
 
----
-
-## What this project does
-
-* Accepts file uploads through an API
-* Saves uploaded files locally
-* Processes files asynchronously using worker threads
-* Detects suspicious payloads and attack patterns
-* Classifies detections into categories
-* Assigns severity levels to threats
-* Stores all scan results in an in memory database
+It operates as an internal microservice behind the Sentinel Proxy gateway and powers the VORTEX dashboard inside Sentinel OS.
 
 ---
 
-## Current Detection Types
+# Features
 
-The worker currently detects patterns related to
-
-* SQL Injection
-* PowerShell execution
-* Command injection
-* Cross site scripting (XSS)
-* Ransomware indicators
-
----
-
-## Severity Levels
-
-Each detection is assigned a severity level
-
-* LOW
-* MEDIUM
-* HIGH
-* CRITICAL
-
-Example:
-
-* SQL injection -> CRITICAL
-* PowerShell execution -> HIGH
-* XSS payload -> MEDIUM
+- Asynchronous file scanning pipeline
+- Malware and attack pattern detection
+- Threat severity classification
+- Worker-based processing model
+- REST API for uploads and analytics
+- PostgreSQL persistence
+- Real-time dashboard integration
+- JWT protected access through reverse proxy
+- Distributed-ready architecture
 
 ---
 
-## Tech Stack
+# Detection Engine
 
-* Java 23
-* Spring Boot
-* Spring Web
-* Spring Data JPA
-* H2 Database
-* Async processing with CompletableFuture
+The detection engine scans uploaded file contents for suspicious indicators and attack signatures.
+
+Current supported detections include:
+
+- SQL Injection
+- Cross Site Scripting (XSS)
+- PowerShell Execution
+- Command Injection
+- Ransomware Indicators
+
+Each detection produces:
+
+- Result classification
+- Severity level
+- Summary
+- Scan metadata
+- Worker attribution
+- Processing timestamps
 
 ---
 
-## API
+# Severity Levels
 
-### Upload a file
+| Severity | Description |
+|---|---|
+| LOW | Benign or safe content |
+| MEDIUM | Suspicious but lower impact |
+| HIGH | Dangerous execution indicators |
+| CRITICAL | Severe malicious payloads |
 
+Example mappings:
+
+| Detection | Severity |
+|---|---|
+| SQL Injection | CRITICAL |
+| Ransomware Indicators | CRITICAL |
+| PowerShell Execution | HIGH |
+| XSS Payload | MEDIUM |
+
+---
+
+# Architecture
+
+VORTEX is designed as a service inside a larger distributed security platform.
+
+Frontend requests flow through:
+
+```text
+Next.js Frontend
+        ↓
+Sentinel Proxy (Go Gateway + JWT)
+        ↓
+VORTEX Service (Spring Boot)
+        ↓
+PostgreSQL
+```
+
+The service is intentionally isolated behind the gateway layer to support:
+
+- centralized authentication
+- rate limiting
+- request tracing
+- security middleware
+- future event streaming
+
+---
+
+# Tech Stack
+
+## Backend
+
+- Java 23
+- Spring Boot
+- Spring Web
+- Spring Data JPA
+- PostgreSQL
+
+## Infrastructure
+
+- Docker
+- Docker Compose
+
+## Platform Integration
+
+- Sentinel Proxy (Go API Gateway)
+- Sentinel OS Dashboard
+- JWT Authentication
+- Redpanda Event Pipeline
+
+---
+
+# API Endpoints
+
+## Submit Scan Job
+
+```http
 POST /api/jobs/submit
-
-Uploads a file and immediately returns a job entry while processing continues asynchronously.
-
-Example using curl
-
-```bash
-curl.exe -X POST -F "file=@test.pdf" http://localhost:8080/api/jobs/submit
 ```
+
+Uploads a file and creates an asynchronous scan job.
 
 ---
 
-### Get all jobs
+## Retrieve All Jobs
 
+```http
 GET /api/jobs/all
-
-Returns all processed jobs with
-
-* status
-* result
-* severity
-* summary
-* timestamps
-
-Example
-
-```bash
-curl.exe http://localhost:8080/api/jobs/all
 ```
+
+Returns all scan jobs and metadata.
 
 ---
 
-## Example Detection Results
+## Retrieve Statistics
 
-### SQL Injection
+```http
+GET /api/jobs/stats
+```
+
+Returns dashboard statistics including:
+
+- total jobs
+- completed jobs
+- failed jobs
+- active workers
+
+---
+
+## Retrieve Analytics
+
+```http
+GET /api/jobs/analytics
+```
+
+Returns aggregated threat analytics by severity level.
+
+---
+
+# Job Lifecycle
+
+Each uploaded file progresses through a processing lifecycle.
+
+```text
+QUEUED
+   ↓
+PROCESSING
+   ↓
+COMPLETED / FAILED
+```
+
+Worker services asynchronously process scan jobs and update results in the database.
+
+---
+
+# Example Detection Result
 
 ```json
 {
+  "id": 12,
+  "name": "payload.txt",
   "result": "SQL_INJECTION",
-  "severity": "CRITICAL"
-}
-```
-
-### PowerShell Payload
-
-```json
-{
-  "result": "POWERSHELL",
-  "severity": "HIGH"
-}
-```
-
-### XSS Payload
-
-```json
-{
-  "result": "XSS",
-  "severity": "MEDIUM"
+  "severity": "CRITICAL",
+  "status": "COMPLETED",
+  "workerNode": "worker-alpha",
+  "scanDurationMs": 27
 }
 ```
 
 ---
 
-## How it works
+# Running Locally
 
-* A file is uploaded through the API
-* The file is stored locally inside the uploads directory
-* A job entry is created with status pending
-* An async worker processes the file in the background
-* File contents are scanned for suspicious patterns
-* Detection results and severity are assigned
-* The database is updated with the completed scan result
-
----
-
-## Run locally
-
-1. Clone the repo
-
-2. Start the application
+## Start with Maven
 
 ```bash
-.\mvnw spring-boot:run
-```
-
-3. Upload test files with curl or PowerShell
-
----
-
-## Example Test Payloads
-
-### Safe file
-
-```powershell
-Set-Content safe.txt "hello world" ; curl.exe -X POST -F "file=@safe.txt" http://localhost:8080/api/jobs/submit
-```
-
-### SQL injection payload
-
-```powershell
-Set-Content sqli.txt "' UNION SELECT password FROM users --" ; curl.exe -X POST -F "file=@sqli.txt" http://localhost:8080/api/jobs/submit
-```
-
-### PowerShell payload
-
-```powershell
-Set-Content ps.txt "powershell Invoke-Expression payload" ; curl.exe -X POST -F "file=@ps.txt" http://localhost:8080/api/jobs/submit
-```
-
-### XSS payload
-
-```powershell
-Set-Content xss.txt "<script>alert('xss')</script>" ; curl.exe -X POST -F "file=@xss.txt" http://localhost:8080/api/jobs/submit
-```
-
-### Ransomware indicators
-
-```powershell
-Set-Content ransom.txt "encrypt bitcoin decrypt ransom" ; curl.exe -X POST -F "file=@ransom.txt" http://localhost:8080/api/jobs/submit
+./mvnw spring-boot:run
 ```
 
 ---
 
-## Notes
+## Docker Deployment
 
-This project started as a simple async job processor and evolved into a lightweight distributed-ready security analysis service.
+The service is designed to run inside the Sentinel Platform Docker environment.
 
-The architecture is intentionally modular so it can later integrate into larger systems such as
-
-* reverse proxies
-* event pipelines
-* observability systems
-* security orchestration platforms
+```bash
+docker compose up --build
+```
 
 ---
 
-## Future Improvements
+# Example Test Payloads
 
-* Persistent database
-* Kafka or Redis queue integration
-* Distributed worker nodes
-* File hash analysis
-* YARA rule support
-* Authentication and authorization
-* Real time frontend dashboard
-* Dockerized deployment
-* Integration into Sentinel Platform and Sentinel OS
+## SQL Injection
+
+```text
+' UNION SELECT password FROM users --
+```
+
+## XSS Payload
+
+```html
+<script>alert('xss')</script>
+```
+
+## PowerShell Execution
+
+```powershell
+powershell Invoke-Expression payload
+```
+
+## Ransomware Indicators
+
+```text
+encrypt bitcoin decrypt ransom
+```
 
 ---
+
+# Platform Goals
+
+VORTEX is part of a broader security engineering project focused on:
+
+- distributed systems
+- detection pipelines
+- observability
+- reverse proxy security
+- event-driven architecture
+- platform engineering
+
+The long-term goal is to evolve VORTEX into a distributed scanning and threat analysis subsystem inside Sentinel OS.
+
+---
+
+# Future Improvements
+
+- Distributed worker nodes
+- Real-time event streaming
+- File hashing and reputation analysis
+- YARA rule support
+- Behavioral analysis
+- Queue-backed job orchestration
+- Threat intelligence integration
+- WebSocket/SSE live scan feeds
+- Kubernetes deployment
+- Multi-node scan scheduling
+
+---
+
+# Status
+
+Active development.
